@@ -1,0 +1,2614 @@
+{
+  "datasets": [
+    {
+      "name": "sales_kpis",
+      "displayName": "Sales KPIs (Metric View)",
+      "queryLines": [
+        "SELECT\n",
+        "  MEASURE(`Net Revenue`) AS net_revenue,\n",
+        "  MEASURE(`Gross Sales`) AS gross_sales,\n",
+        "  MEASURE(`Total Discount`) AS total_discount,\n",
+        "  MEASURE(`Transaction Count`) AS txn_count,\n",
+        "  MEASURE(`Total Units Sold`) AS units_sold,\n",
+        "  MEASURE(`Average Order Value`) AS avg_order_value,\n",
+        "  MEASURE(`Discount Rate`) AS discount_rate,\n",
+        "  MEASURE(`Won Transaction Count`) AS won_txn_count,\n",
+        "  MEASURE(`Transaction Count`) - MEASURE(`Won Transaction Count`) AS lost_txn_count,\n",
+        "  MEASURE(`Won Transaction Count`) / MEASURE(`Transaction Count`) AS won_rate\n",
+        "FROM\n",
+        "  retail.retail_semantic.retail_metrics\n",
+        "GROUP BY\n",
+        "  ALL"
+      ]
+    },
+    {
+      "name": "sales_monthly",
+      "displayName": "Monthly Sales Trend (Metric View)",
+      "queryLines": [
+        "SELECT\n",
+        "  date_trunc('MONTH', `Transaction Date`) AS month,\n",
+        "  MEASURE(`Net Revenue`) AS net_revenue,\n",
+        "  MEASURE(`Gross Sales`) AS gross_sales,\n",
+        "  MEASURE(`Total Discount`) AS total_discount,\n",
+        "  MEASURE(`Transaction Count`) AS txn_count,\n",
+        "  MEASURE(`Total Units Sold`) AS units_sold\n",
+        "FROM\n",
+        "  retail.retail_semantic.retail_metrics\n",
+        "GROUP BY\n",
+        "  ALL\n",
+        "ORDER BY\n",
+        "  month ASC"
+      ]
+    },
+    {
+      "name": "products",
+      "displayName": "Product Dimension SCD2 (dim_product)",
+      "queryLines": [
+        "SELECT\n",
+        "  product_id,\n",
+        "  product_name,\n",
+        "  category,\n",
+        "  subcategory,\n",
+        "  brand,\n",
+        "  supplier_name,\n",
+        "  unit_price,\n",
+        "  launch_date,\n",
+        "  is_active,\n",
+        "  is_current,\n",
+        "  valid_from,\n",
+        "  valid_to\n",
+        "FROM\n",
+        "  retail.gold.dim_product\n",
+        "ORDER BY\n",
+        "  product_name,\n",
+        "  valid_from"
+      ]
+    },
+    {
+      "name": "opportunity_stage",
+      "displayName": "Opportunity Stage Won/Lost (fact_sales)",
+      "queryLines": [
+        "SELECT\n",
+        "  COALESCE(stage_name, 'Unassigned') AS stage_name,\n",
+        "  CASE\n",
+        "    WHEN is_won THEN 'Won'\n",
+        "    ELSE 'Lost'\n",
+        "  END AS outcome,\n",
+        "  COUNT(1) AS txn_count,\n",
+        "  SUM(quantity) AS units_sold,\n",
+        "  SUM(net_amount) AS net_revenue\n",
+        "FROM\n",
+        "  retail.gold.fact_sales\n",
+        "GROUP BY\n",
+        "  COALESCE(stage_name, 'Unassigned'),\n",
+        "  CASE\n",
+        "    WHEN is_won THEN 'Won'\n",
+        "    ELSE 'Lost'\n",
+        "  END\n",
+        "ORDER BY\n",
+        "  net_revenue DESC"
+      ]
+    },
+    {
+      "name": "top_products",
+      "displayName": "Top Products by Net Revenue (Metric View)",
+      "queryLines": [
+        "SELECT\n",
+        "  `Product Name` AS product_name,\n",
+        "  MEASURE(`Net Revenue`) AS net_revenue,\n",
+        "  MEASURE(`Total Units Sold`) AS units_sold,\n",
+        "  MEASURE(`Transaction Count`) AS txn_count\n",
+        "FROM\n",
+        "  retail.retail_semantic.retail_metrics\n",
+        "GROUP BY\n",
+        "  ALL\n",
+        "ORDER BY\n",
+        "  net_revenue DESC\n",
+        "LIMIT 10"
+      ]
+    },
+    {
+      "name": "sales_breakdown",
+      "displayName": "Sales Breakdown (Metric View)",
+      "queryLines": [
+        "SELECT\n",
+        "  `Category` AS category,\n",
+        "  `Subcategory` AS subcategory,\n",
+        "  `Brand` AS brand,\n",
+        "  `Store` AS store,\n",
+        "  `Payment Mode` AS payment_mode,\n",
+        "  `Sales Channel` AS sales_channel,\n",
+        "  `Opportunity Stage` AS stage_name,\n",
+        "  MEASURE(`Net Revenue`) AS net_revenue,\n",
+        "  MEASURE(`Gross Sales`) AS gross_sales,\n",
+        "  MEASURE(`Total Discount`) AS total_discount,\n",
+        "  MEASURE(`Transaction Count`) AS txn_count,\n",
+        "  MEASURE(`Total Units Sold`) AS units_sold,\n",
+        "  MEASURE(`Won Transaction Count`) AS won_txn_count\n",
+        "FROM\n",
+        "  retail.retail_semantic.retail_metrics\n",
+        "GROUP BY\n",
+        "  ALL"
+      ]
+    },
+    {
+      "name": "inventory",
+      "displayName": "Inventory Snapshot (fact_inventory)",
+      "queryLines": [
+        "SELECT\n",
+        "  fi.product_id,\n",
+        "  dp.product_name,\n",
+        "  fi.category,\n",
+        "  fi.subcategory,\n",
+        "  fi.brand,\n",
+        "  fi.store_id,\n",
+        "  fi.warehouse_location,\n",
+        "  fi.stock_quantity,\n",
+        "  fi.reorder_level,\n",
+        "  fi.needs_restock,\n",
+        "  CASE\n",
+        "    WHEN fi.needs_restock THEN 1\n",
+        "    ELSE 0\n",
+        "  END AS restock_flag,\n",
+        "  fi.unit_price_at_snapshot,\n",
+        "  fi.stock_value,\n",
+        "  fi.last_stock_update\n",
+        "FROM\n",
+        "  retail.gold.fact_inventory fi\n",
+        "    LEFT JOIN retail.gold.dim_product dp\n",
+        "      ON fi.product_sk = dp.product_sk\n",
+        "ORDER BY\n",
+        "  fi.stock_value DESC"
+      ]
+    },
+    {
+      "name": "customers",
+      "displayName": "Customer Dimension (dim_customer)",
+      "queryLines": [
+        "SELECT\n",
+        "  customer_id,\n",
+        "  customer_name,\n",
+        "  customer_type,\n",
+        "  industry,\n",
+        "  billing_city,\n",
+        "  billing_state,\n",
+        "  billing_country,\n",
+        "  is_buyer,\n",
+        "  customer_since\n",
+        "FROM\n",
+        "  retail.gold.dim_customer\n",
+        "ORDER BY\n",
+        "  customer_name"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "8eb06155",
+      "displayName": "Executive Summary",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_net_revenue",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Net Revenue"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(net_revenue)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_txn_count",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(txn_count)",
+                      "expression": "SUM(`txn_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Transactions"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(txn_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_units_sold",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(units_sold)",
+                      "expression": "SUM(`units_sold`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Units Sold"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(units_sold)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_aov",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(avg_order_value)",
+                      "expression": "SUM(`avg_order_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Avg Order Value"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(avg_order_value)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_discount_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(discount_rate)",
+                      "expression": "SUM(`discount_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Discount Rate"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(discount_rate)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_won_txns",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(won_txn_count)",
+                      "expression": "SUM(`won_txn_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Won Transactions"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(won_txn_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 10,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "net_revenue_trend",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_monthly",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Net Revenue Trend (Monthly)"
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "month",
+                  "displayName": "month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 8,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "category_mix",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    },
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Net Revenue by Category"
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(net_revenue)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "net_revenue"
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 3,
+            "width": 4,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "sales_deep_dive",
+      "displayName": "Sales Deep Dive",
+      "layout": [
+        {
+          "widget": {
+            "name": "revenue_by_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Revenue by Category"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "revenue_by_subcategory",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "subcategory",
+                      "expression": "`subcategory`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Revenue by Subcategory"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "subcategory",
+                  "displayName": "subcategory",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "subcategory",
+                  "displayName": "subcategory",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "revenue_by_brand",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Revenue by Brand"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "brand",
+                  "displayName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "brand",
+                  "displayName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "units_by_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "sum(units_sold)",
+                      "expression": "SUM(`units_sold`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Units Sold by Category"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(units_sold)",
+                  "displayName": "units_sold",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "units_by_subcategory",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "subcategory",
+                      "expression": "`subcategory`"
+                    },
+                    {
+                      "name": "sum(units_sold)",
+                      "expression": "SUM(`units_sold`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Units Sold by Subcategory"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "subcategory",
+                  "displayName": "subcategory",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(units_sold)",
+                  "displayName": "units_sold",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "subcategory",
+                  "displayName": "subcategory",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 6,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "units_by_brand",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "sum(units_sold)",
+                      "expression": "SUM(`units_sold`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Units Sold by Brand"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "brand",
+                  "displayName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(units_sold)",
+                  "displayName": "units_sold",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "brand",
+                  "displayName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 6,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "top_products",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "top_products",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Top 10 Products by Net Revenue"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "product_name",
+                  "displayName": "product_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "product_name",
+                  "displayName": "product_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "store_performance",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "store",
+                      "expression": "`store`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Store Performance (Net Revenue)"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "store",
+                  "displayName": "store",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "store",
+                  "displayName": "store",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 12,
+            "width": 6,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "payment_mode_mix",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    },
+                    {
+                      "name": "payment_mode",
+                      "expression": "`payment_mode`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Payment Mode Mix (Net Revenue)"
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(net_revenue)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "net_revenue"
+                },
+                "color": {
+                  "fieldName": "payment_mode",
+                  "displayName": "payment_mode",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "sales_channel_mix",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_breakdown",
+                  "fields": [
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    },
+                    {
+                      "name": "sales_channel",
+                      "expression": "`sales_channel`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Sales Channel Mix (Net Revenue)"
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(net_revenue)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "net_revenue"
+                },
+                "color": {
+                  "fieldName": "sales_channel",
+                  "displayName": "sales_channel",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 20,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "opportunity_pipeline",
+      "displayName": "Opportunity Pipeline",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_won_rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(won_rate)",
+                      "expression": "SUM(`won_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Won Rate"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(won_rate)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "stage_funnel",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "opportunity_stage",
+                  "fields": [
+                    {
+                      "name": "sum(txn_count)",
+                      "expression": "SUM(`txn_count`)"
+                    },
+                    {
+                      "name": "stage_name",
+                      "expression": "`stage_name`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Pipeline Funnel: Transactions by Stage"
+              },
+              "version": 3,
+              "widgetType": "funnel",
+              "encodings": {
+                "x": {
+                  "fieldName": "sum(txn_count)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "y": {
+                  "fieldName": "stage_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_won_txns",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(won_txn_count)",
+                      "expression": "SUM(`won_txn_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Won Transactions"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(won_txn_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_lost_txns",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "sales_kpis",
+                  "fields": [
+                    {
+                      "name": "sum(lost_txn_count)",
+                      "expression": "SUM(`lost_txn_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Lost Transactions"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(lost_txn_count)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "won_lost_txns_by_stage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "opportunity_stage",
+                  "fields": [
+                    {
+                      "name": "outcome",
+                      "expression": "`outcome`"
+                    },
+                    {
+                      "name": "stage_name",
+                      "expression": "`stage_name`"
+                    },
+                    {
+                      "name": "sum(txn_count)",
+                      "expression": "SUM(`txn_count`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Won vs Lost Transactions by Stage"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "stage_name",
+                  "displayName": "stage_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(txn_count)",
+                  "displayName": "txn_count",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "outcome",
+                  "displayName": "outcome",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "won_lost_revenue_by_stage",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "opportunity_stage",
+                  "fields": [
+                    {
+                      "name": "outcome",
+                      "expression": "`outcome`"
+                    },
+                    {
+                      "name": "stage_name",
+                      "expression": "`stage_name`"
+                    },
+                    {
+                      "name": "sum(net_revenue)",
+                      "expression": "SUM(`net_revenue`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Won vs Lost Net Revenue by Stage"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "stage_name",
+                  "displayName": "stage_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(net_revenue)",
+                  "displayName": "net_revenue",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "outcome",
+                  "displayName": "outcome",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 9,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "stage_detail",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "opportunity_stage",
+                  "fields": [
+                    {
+                      "name": "stage_name",
+                      "expression": "`stage_name`"
+                    },
+                    {
+                      "name": "outcome",
+                      "expression": "`outcome`"
+                    },
+                    {
+                      "name": "txn_count",
+                      "expression": "`txn_count`"
+                    },
+                    {
+                      "name": "units_sold",
+                      "expression": "`units_sold`"
+                    },
+                    {
+                      "name": "net_revenue",
+                      "expression": "`net_revenue`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Stage Detail"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "stage_name"
+                  },
+                  {
+                    "fieldName": "outcome"
+                  },
+                  {
+                    "fieldName": "txn_count"
+                  },
+                  {
+                    "fieldName": "units_sold"
+                  },
+                  {
+                    "fieldName": "net_revenue"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 16,
+            "width": 12,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "inventory_health",
+      "displayName": "Inventory Health",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_stock_value",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "sum(stock_value)",
+                      "expression": "SUM(`stock_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Total Stock Value"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(stock_value)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "below_reorder_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "store_id",
+                      "expression": "`store_id`"
+                    },
+                    {
+                      "name": "warehouse_location",
+                      "expression": "`warehouse_location`"
+                    },
+                    {
+                      "name": "stock_quantity",
+                      "expression": "`stock_quantity`"
+                    },
+                    {
+                      "name": "reorder_level",
+                      "expression": "`reorder_level`"
+                    },
+                    {
+                      "name": "unit_price_at_snapshot",
+                      "expression": "`unit_price_at_snapshot`"
+                    },
+                    {
+                      "name": "stock_value",
+                      "expression": "`stock_value`"
+                    },
+                    {
+                      "name": "last_stock_update",
+                      "expression": "`last_stock_update`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`needs_restock` = true"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Products Below Reorder Level"
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "product_name"
+                  },
+                  {
+                    "fieldName": "store_id"
+                  },
+                  {
+                    "fieldName": "warehouse_location"
+                  },
+                  {
+                    "fieldName": "stock_quantity"
+                  },
+                  {
+                    "fieldName": "reorder_level"
+                  },
+                  {
+                    "fieldName": "unit_price_at_snapshot"
+                  },
+                  {
+                    "fieldName": "stock_value"
+                  },
+                  {
+                    "fieldName": "last_stock_update"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_stock_units",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "sum(stock_quantity)",
+                      "expression": "SUM(`stock_quantity`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Units in Stock"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(stock_quantity)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_restock_items",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "sum(restock_flag)",
+                      "expression": "SUM(`restock_flag`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Items Below Reorder Level"
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(restock_flag)",
+                  "rowNumber": 0
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "stock_value_by_category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "category",
+                      "expression": "`category`"
+                    },
+                    {
+                      "name": "sum(stock_value)",
+                      "expression": "SUM(`stock_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Stock Value by Category"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(stock_value)",
+                  "displayName": "stock_value",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "category",
+                  "displayName": "category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "stock_value_by_brand",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "sum(stock_value)",
+                      "expression": "SUM(`stock_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Stock Value by Brand"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "brand",
+                  "displayName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(stock_value)",
+                  "displayName": "stock_value",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "brand",
+                  "displayName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "stock_value_by_warehouse",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "inventory",
+                  "fields": [
+                    {
+                      "name": "warehouse_location",
+                      "expression": "`warehouse_location`"
+                    },
+                    {
+                      "name": "sum(stock_value)",
+                      "expression": "SUM(`stock_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Stock Value by Warehouse"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "warehouse_location",
+                  "displayName": "warehouse_location",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(stock_value)",
+                  "displayName": "stock_value",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "warehouse_location",
+                  "displayName": "warehouse_location",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 3,
+            "width": 4,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "products_customers",
+      "displayName": "Products & Customers",
+      "layout": [
+        {
+          "widget": {
+            "name": "price_history",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "products",
+                  "fields": [
+                    {
+                      "name": "product_name",
+                      "expression": "`product_name`"
+                    },
+                    {
+                      "name": "valid_from",
+                      "expression": "`valid_from`"
+                    },
+                    {
+                      "name": "avg(unit_price)",
+                      "expression": "AVG(`unit_price`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Product Price History (SCD2 Versions)"
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "valid_from",
+                  "displayName": "valid_from",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(unit_price)",
+                  "displayName": "unit_price",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "product_name",
+                  "displayName": "product_name",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "launch_timeline",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "products",
+                  "fields": [
+                    {
+                      "name": "brand",
+                      "expression": "`brand`"
+                    },
+                    {
+                      "name": "launch_date",
+                      "expression": "`launch_date`"
+                    },
+                    {
+                      "name": "unit_price",
+                      "expression": "`unit_price`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`is_current` = true"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Product Launch Timeline"
+              },
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "launch_date",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "unit_price",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "brand",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 4,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "customers_by_type",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "customers",
+                  "fields": [
+                    {
+                      "name": "customer_type",
+                      "expression": "`customer_type`"
+                    },
+                    {
+                      "name": "count(customer_id)",
+                      "expression": "COUNT(`customer_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Customers by Type"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "customer_type",
+                  "displayName": "customer_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customer_id)",
+                  "displayName": "customer_id",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "customer_type",
+                  "displayName": "customer_type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "active_status_pie",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "products",
+                  "fields": [
+                    {
+                      "name": "countdistinct(product_id)",
+                      "expression": "COUNT(DISTINCT `product_id`)"
+                    },
+                    {
+                      "name": "is_active",
+                      "expression": "`is_active`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`is_current` = true"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Products by Active Status"
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "countdistinct(product_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "is_active",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 0,
+            "width": 4,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "customers_by_industry",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "customers",
+                  "fields": [
+                    {
+                      "name": "industry",
+                      "expression": "`industry`"
+                    },
+                    {
+                      "name": "count(customer_id)",
+                      "expression": "COUNT(`customer_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Customers by Industry"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "industry",
+                  "displayName": "industry",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customer_id)",
+                  "displayName": "customer_id",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "industry",
+                  "displayName": "industry",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "buyers_vs_nonbuyers",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "customers",
+                  "fields": [
+                    {
+                      "name": "count(customer_id)",
+                      "expression": "COUNT(`customer_id`)"
+                    },
+                    {
+                      "name": "is_buyer",
+                      "expression": "`is_buyer`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Buyers vs Non-Buyers"
+              },
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "count(customer_id)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "customer_id"
+                },
+                "color": {
+                  "fieldName": "is_buyer",
+                  "displayName": "is_buyer",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 8,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "customers_by_state",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "customers",
+                  "fields": [
+                    {
+                      "name": "billing_state",
+                      "expression": "`billing_state`"
+                    },
+                    {
+                      "name": "count(customer_id)",
+                      "expression": "COUNT(`customer_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Customers by Billing State"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "billing_state",
+                  "displayName": "billing_state",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customer_id)",
+                  "displayName": "customer_id",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "billing_state",
+                  "displayName": "billing_state",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "customers_by_country",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "customers",
+                  "fields": [
+                    {
+                      "name": "billing_country",
+                      "expression": "`billing_country`"
+                    },
+                    {
+                      "name": "count(customer_id)",
+                      "expression": "COUNT(`customer_id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": "Customers by Billing Country"
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "billing_country",
+                  "displayName": "billing_country",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(customer_id)",
+                  "displayName": "customer_id",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "billing_country",
+                  "displayName": "billing_country",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 14,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {
+        "light": "#EDEDED",
+        "dark": "#0D151C"
+      },
+      "widgetBackgroundColor": {
+        "light": "#FCFCFD",
+        "dark": "#19232E"
+      },
+      "widgetBorderColor": {
+        "light": "#FCFCFD",
+        "dark": "#19232E"
+      },
+      "selectionColor": {
+        "light": "#2272B4",
+        "dark": "#15AFDD"
+      },
+      "visualizationColors": [
+        "#15AFDD",
+        "#52A870",
+        "#C89930",
+        "#C85070",
+        "#9A7BD1",
+        "#2375A8",
+        "#E8927C",
+        "#5BBF9E"
+      ],
+      "widgetHeaderAlignment": "LEFT",
+      "fontSettings": {
+        "base": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#08141A",
+            "dark": "#EBEBEB"
+          }
+        },
+        "widgetTitle": {
+          "fontFamily": "Inter",
+          "fontColor": {
+            "light": "#08141A",
+            "dark": "#F2F6F9"
+          },
+          "fontWeight": 600
+        }
+      },
+      "gridLineColor": {
+        "light": "#D5D9DD",
+        "dark": "#2B3947"
+      },
+      "axisLineColor": {
+        "light": "#8A97A5",
+        "dark": "#5F7284"
+      },
+      "visualizationColorMappings": [
+        {
+          "value": "Won",
+          "color": "#52A870"
+        },
+        {
+          "value": "Lost",
+          "color": "#C85070"
+        }
+      ]
+    },
+    "applyModeEnabled": false
+  }
+}
